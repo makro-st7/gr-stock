@@ -30,7 +30,7 @@
         
         nav { background-color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 1rem; }
         .logo { font-size: 1.4rem; font-weight: bold; color: var(--primary); }
-        .nav-menu { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .nav-menu { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
         
         .nav-btn { 
             border: none; 
@@ -54,6 +54,10 @@
         .nav-btn:hover { background-color: #cbd5e1; color: #1e293b; }
         .nav-btn.active:hover { background-color: var(--primary-hover) !important; color: white !important; }
         
+        /* สไตล์ปุ่มออกจากระบบ */
+        .logout-btn { background-color: #fee2e2; color: var(--danger); }
+        .logout-btn:hover { background-color: #fca5a5; color: #991b1b; }
+
         main { flex: 1; padding: 1.5rem; max-width: 1200px; width: 100%; margin: 0 auto; }
         .page { display: none; }
         .page.active { display: block; }
@@ -125,6 +129,10 @@
         .text-muted { color: #64748b; font-size: 0.85rem; font-weight: normal; }
         .empty-history { text-align: center; padding: 2rem; color: var(--gray); font-style: italic; }
 
+        /* หน้าต่างกรอกรหัสผ่าน */
+        .login-modal { display: flex; background-color: #1e293b; z-index: 99999; }
+        .login-content { text-align: center; max-width: 400px; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.3); }
+
         @media (max-width: 767px) {
             nav { flex-direction: column; align-items: stretch; padding: 1rem; }
             .logo { text-align: center; }
@@ -140,6 +148,20 @@
 </head>
 <body>
 
+    <div id="loginModal" class="modal login-modal">
+        <div class="modal-content login-content">
+            <h2 style="border: none; padding: 0; text-align: center; margin-bottom: 0.5rem; color: var(--primary);">ระบบจัดการสินค้าคงคลัง GR<h2>
+            <p class="text-muted" style="margin-bottom: 1.5rem;">กรุณากรอกรหัสผ่านแผนกเพื่อเข้าใช้งาน</p>
+            <form id="login-form" onsubmit="checkPassword(event)">
+                <div class="form-group">
+                    <input type="password" id="app-password-input" class="form-control" placeholder="password" style="text-align: center; font-size: 1.2rem; letter-spacing: 4px;" required autocomplete="off">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%; font-size: 1rem; font-weight: bold;">Login</button>
+            </form>
+            <p id="login-error-msg" style="color: var(--danger); font-size: 0.9rem; margin-top: 1rem; display: none; font-weight: bold;">❌ รหัสผ่านไม่ถูกต้อง ลองใหม่อีกครั้ง</p>
+        </div>
+    </div>
+
     <div id="loading" class="loading">⏳ กำลังซิงค์ข้อมูลกับ Google Sheets ล่าสุดเบื้องหลัง...</div>
 
     <nav>
@@ -149,6 +171,7 @@
             <button class="nav-btn" onclick="switchPage('logs-page')">Inventory</button>
             <button class="nav-btn" onclick="switchPage('levels-page')">Levels</button>
             <button class="nav-btn" onclick="switchPage('reports-page')">Report</button>
+            <button class="nav-btn logout-btn" onclick="logoutApp()">Logout</button>
         </div>
     </nav>
 
@@ -356,13 +379,52 @@
         // ใส่ลิงก์ Web App URL ของคุณที่นี่
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzFIehbfMXYTuvgazXvds1Vq5lf3IHRB2TYtclmB8SAttP28YIKHWwzVRyriKwRbFSR/exec"; 
 
+        // 🔑 ตั้งค่ารหัสผ่านที่นี่ (เปลี่ยนได้ตามต้องการ)
+        const APP_PASSWORD = "grkorat007";
+
         let products = [];
         let logs = [];
         let currentLogFilter = 'ALL'; 
 
+        // --- เพิ่มฟังก์ชันระบบรหัสผ่าน ---
+        function checkLoginStatus() {
+            const isLogin = sessionStorage.getItem('gr_stock_login');
+            if (isLogin === 'true') {
+                document.getElementById('loginModal').style.display = 'none';
+                loadLocalData(); // ยอมให้โหลดข้อมูลเมื่อรหัสผ่านผ่านแล้ว
+            } else {
+                document.getElementById('loginModal').style.display = 'flex';
+            }
+        }
+
+        function checkPassword(e) {
+            e.preventDefault();
+            const inputPass = document.getElementById('app-password-input').value;
+            const errorMsg = document.getElementById('login-error-msg');
+            
+            if (inputPass === APP_PASSWORD) {
+                sessionStorage.setItem('gr_stock_login', 'true');
+                errorMsg.style.display = 'none';
+                document.getElementById('loginModal').style.display = 'none';
+                document.getElementById('app-password-input').value = '';
+                loadLocalData(); // ดึงข้อมูลทันทีหลังกรอกถูก
+            } else {
+                errorMsg.style.display = 'block';
+                document.getElementById('app-password-input').value = '';
+                document.getElementById('app-password-input').focus();
+            }
+        }
+
+        function logoutApp() {
+            if(confirm("คุณต้องการออกจากระบบใช่หรือไม่?")) {
+                sessionStorage.removeItem('gr_stock_login');
+                location.reload(); // รีโหลดเพื่อเคลียร์ค่าหน้าจอและกลับหน้าล็อกอิน
+            }
+        }
+        // -----------------------------
+
         function showLoading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; }
 
-        // โดดเด่นด้วยเทคนิคเปิดปุ๊บแสดงข้อมูลจาก Cache ทันที แล้วแอบโหลดจาก Google Sheets มาอัปเดตเบื้องหลัง
         async function loadLocalData() {
             const cachedData = localStorage.getItem('stock_drivein_cache');
             if (cachedData) {
@@ -377,7 +439,7 @@
                     console.log("โหลดข้อมูลจากหน่วยความจำเครื่อง (Cache) สำเร็จ มอบความเร็ว 0.1 วินาที");
                 } catch(e) { console.error("Error parsing cache", e); }
             } else {
-                showLoading(true); // ถ้าเครื่องไม่มีข้อมูลเก่าเลย ค่อยเปิดหมุน Loading รอ
+                showLoading(true);
             }
             
             try {
@@ -395,7 +457,6 @@
             }
         }
 
-        // สั่งให้หน้าจอทำงานทันที (Optimistic UI) แล้วแอบส่งบันทึกไป Google Sheets ข้างหลัง
         async function saveLocalData() {
             localStorage.setItem('stock_drivein_cache', JSON.stringify({ products, logs }));
             renderAll();
@@ -415,7 +476,7 @@
             document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(pageId).classList.add('active');
-            const currentBtn = Array.from(document.querySelectorAll('.nav-btn')).find(btn => btn.getAttribute('onclick').includes(pageId));
+            const currentBtn = Array.from(document.querySelectorAll('.nav-btn')).find(btn => btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(pageId));
             if(currentBtn) currentBtn.classList.add('active');
             renderAll();
         }
@@ -600,7 +661,7 @@
                 if (lot) lot.qty += newQty; else product.lots.push({ importDate: newImportDate, expiryDate: newExpiryDate, qty: newQty });
             } else {
                 let lot = product.lots.find(l => l.importDate === newImportDate && l.expiryDate === newExpiryDate);
-                if (!lot || lot.qty < newQty) { alert("สินค้าในล็อตนี้ไม่พอให้หักจ่าย!"); loadLocalData(); return; }
+                if (!lot || lot.qty < newQty) { alert("สินค้าในล็อตนี้ไม่พอให้หักจ่าย!"); checkLoginStatus(); return; }
                 lot.qty -= newQty;
             }
             oldLog.qty = newQty; oldLog.importDate = newImportDate; oldLog.expiryDate = newExpiryDate;
@@ -805,7 +866,6 @@
 
         function clearAllData() { if(confirm("⚠️ ล้างข้อมูลทั้งหมดทั้งเว็บและใน Google Sheets?")) { products = []; logs = []; localStorage.removeItem('stock_drivein_cache'); saveLocalData(); } }
 
-        // [อัปเดตใหม่]: ระบบส่งออกข้อมูล Excel ทางการและสมบูรณ์แบบเพื่อนำไปวิเคราะห์ต่อได้ทันที
         function exportToExcel() {
             const chks = document.querySelectorAll('.report-item-chk:checked');
             if (chks.length === 0) { 
@@ -816,7 +876,6 @@
             const startD = document.getElementById('report-start-date').value || "-";
             const endD = document.getElementById('report-end-date').value || "-";
 
-            // ข้อมูลโครงสร้างแบบ Flat Table รองรับการทำ Pivot Table และเป็นสากล
             const rows = [
                 ["รายงานข้อมูลสถานะสินค้าคงคลังเชิงลึก (Drive-in Warehouse Report)"],
                 [`ช่วงวันที่ตรวจสอบ: ${startD} ถึง ${endD} | วันที่ดึงข้อมูล: ${new Date().toLocaleDateString('th-TH')}`],
@@ -838,7 +897,6 @@
                 ]);
             });
 
-            // เพิ่มแถวผลรวมแบบอัตโนมัติ (Dynamic Excel Formula)
             const totalRowIndex = rows.length + 1;
             const lastDataRow = totalRowIndex - 1;
             
@@ -853,7 +911,6 @@
             const ws = XLSX.utils.aoa_to_sheet(rows);
             const wb = XLSX.utils.book_new();
             
-            // ป้องกันข้อความยาวเกินช่องด้วยการล็อกขนาดความกว้างแบบ Autofit Column Width
             ws['!cols'] = [
                 { wch: 6 },   // ลำดับ
                 { wch: 15 },  // รหัสสินค้า
@@ -868,7 +925,6 @@
             XLSX.writeFile(wb, `Inventory_Analysis_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
         }
 
-        // [อัปเดตใหม่]: ระบบส่งออกข้อมูล Word ที่สุภาพ เป็นทางการ และเพิ่มช่องเซ็นอนุมัติผู้บริหาร
         function exportToWord() {
             const chks = document.querySelectorAll('.report-item-chk:checked');
             if (chks.length === 0) { alert('กรุณาเลือกรายการสินค้าอย่างน้อย 1 รายการก่อนส่งออกครับ'); return; }
@@ -992,7 +1048,8 @@
             finally { showLoading(false); }
         }
 
-        window.onload = loadLocalData;
+        // เปลี่ยนตัวเริ่มจากเดิมเรียก loadLocalData ตรงๆ มาเป็นเรียกตรวจสถานะรหัสผ่านก่อน
+        window.onload = checkLoginStatus;
     </script>
 </body>
 </html>
