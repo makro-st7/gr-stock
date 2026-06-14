@@ -376,22 +376,52 @@
     </div>
 
     <script>
-        // ใส่ลิงก์ Web App URL ของคุณที่นี่
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzFIehbfMXYTuvgazXvds1Vq5lf3IHRB2TYtclmB8SAttP28YIKHWwzVRyriKwRbFSR/exec"; 
-
-        // 🔑 ตั้งค่ารหัสผ่านที่นี่ (เปลี่ยนได้ตามต้องการ)
         const APP_PASSWORD = "grkorat007";
 
         let products = [];
         let logs = [];
         let currentLogFilter = 'ALL'; 
 
-        // --- เพิ่มฟังก์ชันระบบรหัสผ่าน ---
+        // --- 🛠️ ฟังก์ชันจัดระเบียบวันที่ให้สะอาด เป็น ค.ศ. (YYYY-MM-DD) เสมอ ---
+        function cleanToStandardDate(dateStr) {
+            if (!dateStr) return "-";
+            let dStr = dateStr.toString().trim();
+            
+            // ดักจับรูปแบบ "เวลาอินโดจีน / GMT" และแปลงให้เหลือ YYYY-MM-DD
+            if (dStr.indexOf("GMT") !== -1 || dStr.indexOf("เวลาอินโดจีน") !== -1) {
+                try {
+                    const pDate = new Date(dStr);
+                    if (!isNaN(pDate.getTime())) {
+                        const y = pDate.getFullYear();
+                        const m = String(pDate.getMonth() + 1).padStart(2, '0');
+                        const d = String(pDate.getDate()).padStart(2, '0');
+                        return `${y}-${m}-${d}`;
+                    }
+                } catch(e) {}
+            }
+            
+            // คืนค่ารูปแบบสากลเดิมหากเช็คแล้วว่าถูกต้อง
+            if (dStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dStr;
+            return dStr;
+        }
+
+        function getStandardTimestamp() {
+            const now = new Date();
+            const y = now.getFullYear(); 
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            const ss = String(now.getSeconds()).padStart(2, '0');
+            return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+        }
+
         function checkLoginStatus() {
             const isLogin = sessionStorage.getItem('gr_stock_login');
             if (isLogin === 'true') {
                 document.getElementById('loginModal').style.display = 'none';
-                loadLocalData(); // ยอมให้โหลดข้อมูลเมื่อรหัสผ่านผ่านแล้ว
+                loadLocalData();
             } else {
                 document.getElementById('loginModal').style.display = 'flex';
             }
@@ -407,7 +437,7 @@
                 errorMsg.style.display = 'none';
                 document.getElementById('loginModal').style.display = 'none';
                 document.getElementById('app-password-input').value = '';
-                loadLocalData(); // ดึงข้อมูลทันทีหลังกรอกถูก
+                loadLocalData();
             } else {
                 errorMsg.style.display = 'block';
                 document.getElementById('app-password-input').value = '';
@@ -418,10 +448,9 @@
         function logoutApp() {
             if(confirm("คุณต้องการออกจากระบบใช่หรือไม่?")) {
                 sessionStorage.removeItem('gr_stock_login');
-                location.reload(); // รีโหลดเพื่อเคลียร์ค่าหน้าจอและกลับหน้าล็อกอิน
+                location.reload();
             }
         }
-        // -----------------------------
 
         function showLoading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; }
 
@@ -436,7 +465,6 @@
                     document.getElementById('report-start-date').value = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
                     document.getElementById('report-end-date').value = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
                     renderAll(); 
-                    console.log("โหลดข้อมูลจากหน่วยความจำเครื่อง (Cache) สำเร็จ มอบความเร็ว 0.1 วินาที");
                 } catch(e) { console.error("Error parsing cache", e); }
             } else {
                 showLoading(true);
@@ -500,13 +528,13 @@
             const name = document.getElementById('new-p-name').value.trim();
             const perPallet = parseInt(document.getElementById('new-p-per-pallet').value);
             const qty = parseInt(document.getElementById('new-p-qty').value);
-            const importDate = document.getElementById('new-p-import-date').value;
-            const expiryDate = document.getElementById('new-p-expiry-date').value;
+            const importDate = cleanToStandardDate(document.getElementById('new-p-import-date').value);
+            const expiryDate = cleanToStandardDate(document.getElementById('new-p-expiry-date').value);
             
             if (products.some(p => p.id.toString().toLowerCase() === id.toLowerCase())) { alert("รหัสสินค้านี้มีอยู่ในระบบแล้ว!"); return; }
             closeModal('addProductModal');
-            const timestamp = new Date().toLocaleString('th-TH');
-
+            
+            const timestamp = getStandardTimestamp();
             const newProd = { id, name, perPallet, lots: [] };
             if (qty > 0) {
                 newProd.lots.push({ importDate, expiryDate, qty });
@@ -551,15 +579,16 @@
                     const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                     const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
                     if (jsonData.length === 0) { alert("ไม่พบข้อมูลสินค้าในไฟล์ Excel"); return; }
-                    const timestamp = new Date().toLocaleString('th-TH');
+                    
+                    const timestamp = getStandardTimestamp();
 
                     jsonData.forEach(row => {
                         let id = findExcelValue(row, ['รหัสสินค้า', 'ProductID', 'id']);
                         let name = findExcelValue(row, ['ชื่อสินค้า', 'ProductName', 'name']);
                         let perPallet = parseInt(findExcelValue(row, ['จำนวนต่อพาเลท', 'PerPallet', 'pallet_size']) || 0);
                         let qty = parseInt(findExcelValue(row, ['จำนวนเริ่มต้น', 'InitialQty', 'qty', 'จำนวน']) || 0);
-                        let importDate = formatExcelDate(findExcelValue(row, ['วันนำเข้า', 'date_in'])) || new Date().toISOString().split('T')[0];
-                        let expiryDate = formatExcelDate(findExcelValue(row, ['วันหมดอายุ', 'date_exp'])) || new Date().toISOString().split('T')[0];
+                        let importDate = cleanToStandardDate(formatExcelDate(findExcelValue(row, ['วันนำเข้า', 'date_in']))) || new Date().toISOString().split('T')[0];
+                        let expiryDate = cleanToStandardDate(formatExcelDate(findExcelValue(row, ['วันหมดอายุ', 'date_exp']))) || new Date().toISOString().split('T')[0];
                         
                         id = id ? id.toString().trim() : ""; 
                         name = name ? name.toString().trim() : "";
@@ -587,12 +616,12 @@
                     const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                     const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
                     jsonData.forEach(row => {
-                        let timestamp = findExcelValue(row, ['วันเวลา', 'Timestamp', 'time']) || new Date().toLocaleString('th-TH');
+                        let timestamp = findExcelValue(row, ['วันเวลา', 'Timestamp', 'time']) || getStandardTimestamp();
                         let id = findExcelValue(row, ['รหัสสินค้า', 'ProductID', 'id']);
                         let type = findExcelValue(row, ['ประเภท', 'Type', 'action']); 
                         let qty = parseInt(findExcelValue(row, ['จำนวน', 'Qty', 'amount']) || 0);
-                        let importDate = formatExcelDate(findExcelValue(row, ['วันนำเข้า', 'lot_in']));
-                        let expiryDate = formatExcelDate(findExcelValue(row, ['วันหมดอายุ', 'lot_exp']));
+                        let importDate = cleanToStandardDate(formatExcelDate(findExcelValue(row, ['วันนำเข้า', 'lot_in'])));
+                        let expiryDate = cleanToStandardDate(formatExcelDate(findExcelValue(row, ['วันหมดอายุ', 'lot_exp'])));
                         id = id ? id.toString().trim() : ""; type = type ? type.toString().trim().toUpperCase() : "";
 
                         const product = products.find(p => p.id.toLowerCase() === id.toLowerCase());
@@ -616,14 +645,14 @@
 
         function rollbackStockValue(logObj) {
             const product = products.find(p => p.id === logObj.pId); if (!product) return;
-            let lot = product.lots.find(l => l.importDate === logObj.importDate && l.expiryDate === logObj.expiryDate);
+            let lot = product.lots.find(l => l.importDate === cleanToStandardDate(logObj.importDate) && l.expiryDate === cleanToStandardDate(logObj.expiryDate));
             if (logObj.type === 'IN') { 
                 if (lot) {
                     lot.qty -= logObj.qty; 
                     if(lot.qty < 0) lot.qty = 0;
                 }
             } else { 
-                if (lot) lot.qty += logObj.qty; else product.lots.push({ importDate: logObj.importDate, expiryDate: logObj.expiryDate, qty: logObj.qty }); 
+                if (lot) lot.qty += logObj.qty; else product.lots.push({ importDate: cleanToStandardDate(logObj.importDate), expiryDate: cleanToStandardDate(logObj.expiryDate), qty: logObj.qty }); 
             }
         }
 
@@ -641,7 +670,8 @@
         function openEditLogModal(logId) {
             const targetLog = logs.find(l => l.logId === logId); if (!targetLog) return;
             document.getElementById('edit-log-id').value = logId; document.getElementById('edit-log-qty').value = targetLog.qty;
-            document.getElementById('edit-log-import-date').value = targetLog.importDate || ''; document.getElementById('edit-log-expiry-date').value = targetLog.expiryDate || '';
+            document.getElementById('edit-log-import-date').value = cleanToStandardDate(targetLog.importDate) || ''; 
+            document.getElementById('edit-log-expiry-date').value = cleanToStandardDate(targetLog.expiryDate) || '';
             document.getElementById('edit-log-subtitle').innerText = `แก้ไข: ${targetLog.pName}`; openModal('editLogModal');
         }
 
@@ -649,8 +679,8 @@
             e.preventDefault();
             const logId = document.getElementById('edit-log-id').value; 
             const newQty = parseInt(document.getElementById('edit-log-qty').value);
-            const newImportDate = document.getElementById('edit-log-import-date').value; 
-            const newExpiryDate = document.getElementById('edit-log-expiry-date').value;
+            const newImportDate = cleanToStandardDate(document.getElementById('edit-log-import-date').value); 
+            const newExpiryDate = cleanToStandardDate(document.getElementById('edit-log-expiry-date').value);
             
             const index = logs.findIndex(l => l.logId === logId); if (index === -1) return;
             const oldLog = logs[index]; const product = products.find(p => p.id === oldLog.pId); if (!product) return;
@@ -721,7 +751,10 @@
             const filtered = logs.filter(l => (l.pName.toLowerCase().includes(search) || l.pId.toLowerCase().includes(search)) && (currentLogFilter === 'ALL' || l.type === currentLogFilter));
             if(filtered.length === 0) { tbody.innerHTML = `<tr><td colspan="7" class="empty-history">❌ ไม่พบประวัติ</td></tr>`; return; }
             filtered.forEach(l => {
-                tbody.innerHTML += `<tr><td>${l.timestamp}</td><td><b>[${l.pId}]</b> ${l.pName}</td><td><span class="badge ${l.type === 'IN' ? 'badge-in' : 'badge-out'}">${l.type === 'IN' ? '📥 นำเข้า' : '📤 นำออก'}</span></td><td><b>${l.qty}</b> พาเลท</td><td>${l.importDate || '-'}</td><td>${l.expiryDate || '-'}</td><td style="text-align: center;"><button class="btn btn-warning" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="openEditLogModal('${l.logId}')">✏️ แก้ไข</button> <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteLog('${l.logId}')">🗑️ ลบ</button></td></tr>`;
+                // เพิ่มตัวบังคับล้างความสะอาดวันที่ให้เป็น ค.ศ. ก่อนยัดลง HTML ตารางประวัติ
+                let displayInD = cleanToStandardDate(l.importDate);
+                let displayExpD = cleanToStandardDate(l.expiryDate);
+                tbody.innerHTML += `<tr><td>${l.timestamp}</td><td><b>[${l.pId}]</b> ${l.pName}</td><td><span class="badge ${l.type === 'IN' ? 'badge-in' : 'badge-out'}">${l.type === 'IN' ? '📥 นำเข้า' : '📤 นำออก'}</span></td><td><b>${l.qty}</b> พาเลท</td><td>${displayInD}</td><td>${displayExpD}</td><td style="text-align: center;"><button class="btn btn-warning" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="openEditLogModal('${l.logId}')">✏️ แก้ไข</button> <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteLog('${l.logId}')">🗑️ ลบ</button></td></tr>`;
             });
         }
 
@@ -732,11 +765,13 @@
                 if (p.id.toLowerCase().includes(search) || p.name.toLowerCase().includes(search)) {
                     p.lots.forEach(lot => {
                         if(lot.qty <= 0) return;
-                        const diffDays = Math.ceil((new Date(lot.expiryDate) - today) / (1000 * 60 * 60 * 24));
+                        const cleanInDate = cleanToStandardDate(lot.importDate);
+                        const cleanExpDate = cleanToStandardDate(lot.expiryDate);
+                        const diffDays = Math.ceil((new Date(cleanExpDate) - today) / (1000 * 60 * 60 * 24));
                         let status = `<span class="badge badge-in">ปกติ</span>`;
                         if (diffDays <= 0) status = `<span class="badge badge-out">❌ หมดอายุ</span>`;
                         else if (diffDays <= 45) status = `<span class="badge badge-warning">⚠️ เหลือ ${diffDays} วัน</span>`;
-                        tbody.innerHTML += `<tr class="${diffDays <= 45 ? 'row-warning' : ''}"><td>${p.id}</td><td>${p.name}</td><td>${lot.importDate}</td><td>${lot.expiryDate}</td><td><b>${lot.qty}</b> พาเลท</td><td>${status}</td></tr>`;
+                        tbody.innerHTML += `<tr class="${diffDays <= 45 ? 'row-warning' : ''}"><td>${p.id}</td><td>${p.name}</td><td>${cleanInDate}</td><td>${cleanExpDate}</td><td><b>${lot.qty}</b> พาเลท</td><td>${status}</td></tr>`;
                     });
                 }
             });
@@ -754,7 +789,8 @@
                 let sumIn = 0, sumOut = 0;
                 
                 logs.forEach(l => { 
-                    if(l.pId === p.id && l.importDate >= start && l.importDate <= end) { 
+                    const checkDate = cleanToStandardDate(l.importDate);
+                    if(l.pId === p.id && checkDate >= start && checkDate <= end) { 
                         if(l.type === 'IN') sumIn += l.qty; else sumOut += l.qty; 
                     } 
                 });
@@ -798,8 +834,9 @@
             products.forEach(p => {
                 p.lots.forEach(lot => {
                     if (lot.qty > 0) {
-                        const diff = MathDiff.ceil((new Date(lot.expiryDate) - today) / (1000 * 60 * 60 * 24));
-                        if (diff <= 45) { count++; tbody.innerHTML += `<tr><td><b>${p.id}</b></td><td>${p.name}</td><td style="color: #dc2626;">${lot.expiryDate}</td><td><b>${lot.qty}</b> พาเลท</td><td><span class="badge ${diff <= 0 ? 'badge-out':'badge-warning'}">${diff<=0?'❌ หมดอายุ':'⚠️ เหลือ '+diff+' วัน'}</span></td></tr>`; }
+                        const checkExpDate = cleanToStandardDate(lot.expiryDate);
+                        const diff = MathDiff.ceil((new Date(checkExpDate) - today) / (1000 * 60 * 60 * 24));
+                        if (diff <= 45) { count++; tbody.innerHTML += `<tr><td><b>${p.id}</b></td><td>${p.name}</td><td style="color: #dc2626;">${checkExpDate}</td><td><b>${lot.qty}</b> พาเลท</td><td><span class="badge ${diff <= 0 ? 'badge-out':'badge-warning'}">${diff<=0?'❌ หมดอายุ':'⚠️ เหลือ '+diff+' วัน'}</span></td></tr>`; }
                     }
                 });
             });
@@ -819,7 +856,7 @@
                 lotGroup.style.display = 'block'; document.getElementById('import-date-group').style.display = 'none'; document.getElementById('expiry-date-group').style.display = 'none';
                 const select = document.getElementById('modal-lot-select'); select.innerHTML = '';
                 product.lots.forEach((l, idx) => { 
-                    if(l.qty > 0) select.innerHTML += `<option value="${idx}">หมดอายุ: ${l.expiryDate} (คงเหลือ ${l.qty} พาเลท)</option>`; 
+                    if(l.qty > 0) select.innerHTML += `<option value="${idx}">หมดอายุ: ${cleanToStandardDate(l.expiryDate)} (คงเหลือ ${l.qty} พาเลท)</option>`; 
                 });
                 updateMaxQtyField();
             }
@@ -838,18 +875,22 @@
             e.preventDefault();
             const pId = document.getElementById('modal-p-id').value; const action = document.getElementById('modal-action-type').value; const qty = parseInt(document.getElementById('modal-qty').value);
             const product = products.find(p => p.id === pId); if(!product) return;
-            const timestamp = new Date().toLocaleString('th-TH');
+            
+            const timestamp = getStandardTimestamp();
             let inD = '', expD = '';
 
             if (action === 'IN') {
-                inD = document.getElementById('modal-import-date').value; expD = document.getElementById('modal-expiry-date').value;
+                inD = cleanToStandardDate(document.getElementById('modal-import-date').value); 
+                expD = cleanToStandardDate(document.getElementById('modal-expiry-date').value);
                 if(!expD) { alert('กรุณาระบุวันหมดอายุด้วยครับ'); return; }
-                let lot = product.lots.find(l => l.importDate === inD && l.expiryDate === expD);
+                let lot = product.lots.find(l => cleanToStandardDate(l.importDate) === inD && cleanToStandardDate(l.expiryDate) === expD);
                 if(lot) lot.qty += qty; else product.lots.push({ importDate: inD, expiryDate: expD, qty });
             } else {
                 const idx = document.getElementById('modal-lot-select').value; const lot = product.lots[idx];
                 if(!lot || lot.qty < qty) { alert('สินค้าในล็อตที่เลือกไม่พอครับ!'); return; }
-                lot.qty -= qty; inD = lot.importDate; expD = lot.expiryDate;
+                lot.qty -= qty; 
+                inD = cleanToStandardDate(lot.importDate); 
+                expD = cleanToStandardDate(lot.expiryDate);
             }
             logs.unshift({ logId: "LOG-"+Date.now(), timestamp, pId, pName: product.name, type: action, qty, importDate: inD, expiryDate: expD });
             closeModal('stockModal'); saveLocalData();
@@ -860,7 +901,9 @@
             document.getElementById('history-modal-title').innerText = `📈 ประวัติ: ${p.name}`;
             const tbody = document.getElementById('history-table-body'); tbody.innerHTML = ''; const pLogs = logs.filter(l => l.pId === pId);
             if(pLogs.length === 0) tbody.innerHTML = `<tr><td colspan="5" class="empty-history">ไม่มีประวัติ</td></tr>`;
-            else pLogs.forEach(l => { tbody.innerHTML += `<tr><td>${l.timestamp}</td><td><span class="badge ${l.type==='IN'?'badge-in':'badge-out'}">${l.type==='IN'?'นำเข้า':'นำออก'}</span></td><td><b>${l.qty}</b> พาเลท</td><td>${l.importDate}</td><td>${l.expiryDate}</td></tr>`; });
+            else pLogs.forEach(l => { 
+                tbody.innerHTML += `<tr><td>${l.timestamp}</td><td><span class="badge ${l.type==='IN'?'badge-in':'badge-out'}">${l.type==='IN'?'นำเข้า':'นำออก'}</span></td><td><b>${l.qty}</b> พาเลท</td><td>${cleanToStandardDate(l.importDate)}</td><td>${cleanToStandardDate(l.expiryDate)}</td></tr>`; 
+            });
             openModal('historyModal');
         }
 
@@ -878,7 +921,7 @@
 
             const rows = [
                 ["รายงานข้อมูลสถานะสินค้าคงคลังเชิงลึก (Drive-in Warehouse Report)"],
-                [`ช่วงวันที่ตรวจสอบ: ${startD} ถึง ${endD} | วันที่ดึงข้อมูล: ${new Date().toLocaleDateString('th-TH')}`],
+                ["ช่วงวันที่ตรวจสอบ: " + startD + " ถึง " + endD + " | วันที่ดึงข้อมูล: " + new Date().toLocaleDateString('th-TH')],
                 [], 
                 ["ลำดับ", "รหัสสินค้า", "ชื่อรายการสินค้า", "ยอดนำเข้าสะสม (พาเลท)", "ยอดนำออกสะสม (พาเลท)", "ยอดคงเหลือสุทธิ (พาเลท)", "ปริมาณสินค้ารวม (MU)"]
             ];
@@ -887,13 +930,13 @@
             chks.forEach(chk => {
                 const tds = chk.closest('tr').querySelectorAll('td');
                 rows.push([
-                    rowIndex++,                                     // ลำดับ
-                    tds[1].innerText,                               // รหัสสินค้า
-                    tds[2].innerText,                               // ชื่อสินค้า
-                    Number(tds[3].innerText.replace(/,/g,'')),      // คลีนตัวคั่นเพื่อแปลงเป็นตัวเลขดิบสำหรับสูตรคำนวณ
-                    Number(tds[4].innerText.replace(/,/g,'')),      // แปลงเป็นตัวเลข
-                    Number(tds[5].innerText.replace(/[^0-9]/g,'')),    // แปลงเป็นตัวเลขคงเหลือ
-                    Number(tds[6].innerText.replace(/,/g,''))       // แปลงเป็นตัวเลขปริมาณรวม MU
+                    rowIndex++,                                     
+                    tds[1].innerText,                               
+                    tds[2].innerText,                               
+                    Number(tds[3].innerText.replace(/,/g,'')),      
+                    Number(tds[4].innerText.replace(/,/g,'')),      
+                    Number(tds[5].innerText.replace(/[^0-9]/g,'')),    
+                    Number(tds[6].innerText.replace(/,/g,''))       
                 ]);
             });
 
@@ -912,13 +955,13 @@
             const wb = XLSX.utils.book_new();
             
             ws['!cols'] = [
-                { wch: 6 },   // ลำดับ
-                { wch: 15 },  // รหัสสินค้า
-                { wch: 35 },  // ชื่อรายการสินค้า
-                { wch: 22 },  // ยอดนำเข้า
-                { wch: 22 },  // ยอดนำออก
-                { wch: 22 },  // คงเหลือ
-                { wch: 20 }   // ปริมาณรวม MU
+                { wch: 6 },   
+                { wch: 15 },  
+                { wch: 35 },  
+                { wch: 22 },  
+                { wch: 22 },  
+                { wch: 22 },  
+                { wch: 20 }   
             ];
 
             XLSX.utils.book_append_sheet(wb, ws, "Inventory_Analysis_Report");
@@ -1048,7 +1091,6 @@
             finally { showLoading(false); }
         }
 
-        // เปลี่ยนตัวเริ่มจากเดิมเรียก loadLocalData ตรงๆ มาเป็นเรียกตรวจสถานะรหัสผ่านก่อน
         window.onload = checkLoginStatus;
     </script>
 </body>
