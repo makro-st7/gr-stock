@@ -378,17 +378,30 @@
     <script>
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzFIehbfMXYTuvgazXvds1Vq5lf3IHRB2TYtclmB8SAttP28YIKHWwzVRyriKwRbFSR/exec"; 
         const APP_PASSWORD = "grkorat007";
+        
+        // 🔑 ตั้งค่ารหัสผ่านสำหรับการลบข้อมูลที่นี่
+        const DELETE_PASSWORD = "1234";
 
         let products = [];
         let logs = [];
         let currentLogFilter = 'ALL'; 
 
-        // --- 🛠️ ฟังก์ชันจัดระเบียบวันที่ให้สะอาด เป็น ค.ศ. (YYYY-MM-DD) เสมอ ---
+        // --- 🛠️ ฟังก์ชันตรวจสอบรหัสผ่านก่อนทำลายข้อมูลสต๊อก ---
+        function validateDeletePermission() {
+            const userPass = prompt("⚠️ เอกสารนี้สำคัญมาก! กรุณากรอกรหัสผ่านเพื่อยืนยันการลบข้อมูล:");
+            if (userPass === null) return false; // กดยกเลิก
+            if (userPass === DELETE_PASSWORD) {
+                return true;
+            } else {
+                alert("❌ รหัสผ่านไม่ถูกต้อง! ระบบปฏิเสธการลบข้อมูล");
+                return false;
+            }
+        }
+
         function cleanToStandardDate(dateStr) {
             if (!dateStr) return "-";
             let dStr = dateStr.toString().trim();
             
-            // ดักจับรูปแบบ "เวลาอินโดจีน / GMT" และแปลงให้เหลือ YYYY-MM-DD
             if (dStr.indexOf("GMT") !== -1 || dStr.indexOf("เวลาอินโดจีน") !== -1) {
                 try {
                     const pDate = new Date(dStr);
@@ -401,7 +414,6 @@
                 } catch(e) {}
             }
             
-            // คืนค่ารูปแบบสากลเดิมหากเช็คแล้วว่าถูกต้อง
             if (dStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dStr;
             return dStr;
         }
@@ -645,7 +657,7 @@
 
         function rollbackStockValue(logObj) {
             const product = products.find(p => p.id === logObj.pId); if (!product) return;
-            let lot = product.lots.find(l => l.importDate === cleanToStandardDate(logObj.importDate) && l.expiryDate === cleanToStandardDate(logObj.expiryDate));
+            let lot = product.lots.find(l => cleanToStandardDate(l.importDate) === cleanToStandardDate(logObj.importDate) && cleanToStandardDate(l.expiryDate) === cleanToStandardDate(logObj.expiryDate));
             if (logObj.type === 'IN') { 
                 if (lot) {
                     lot.qty -= logObj.qty; 
@@ -658,12 +670,20 @@
 
         function deleteLog(logId) {
             const index = logs.findIndex(l => l.logId === logId); if (index === -1) return;
-            const targetLog = logs[index]; if (!confirm(`⚠️ ยืนยันการลบข้อมูลสินค้า ${targetLog.pName}?`)) return;
+            const targetLog = logs[index]; 
+            
+            // เพิ่มการตรวจเช็ครหัสผ่านสี่ตัวตรงนี้
+            if (!validateDeletePermission()) return;
+            
             rollbackStockValue(targetLog); logs.splice(index, 1); saveLocalData();
         }
 
         function clearAllLogs() {
-            if (!confirm("❌ ล้างประวัติ Log ทั้งหมดใน Google Sheets และเซ็ตสต๊อกเป็น 0?")) return;
+            if (!confirm("❌ ยืนยันการล้างประวัติ Log ทั้งหมดใน Google Sheets และเซ็ตสต๊อกสินค้าทั้งหมดเป็น 0?")) return;
+            
+            // เพิ่มการตรวจเช็ครหัสผ่านสี่ตัวตรงนี้
+            if (!validateDeletePermission()) return;
+            
             products.forEach(p => p.lots = []); logs = []; saveLocalData();
         }
 
@@ -751,7 +771,6 @@
             const filtered = logs.filter(l => (l.pName.toLowerCase().includes(search) || l.pId.toLowerCase().includes(search)) && (currentLogFilter === 'ALL' || l.type === currentLogFilter));
             if(filtered.length === 0) { tbody.innerHTML = `<tr><td colspan="7" class="empty-history">❌ ไม่พบประวัติ</td></tr>`; return; }
             filtered.forEach(l => {
-                // เพิ่มตัวบังคับล้างความสะอาดวันที่ให้เป็น ค.ศ. ก่อนยัดลง HTML ตารางประวัติ
                 let displayInD = cleanToStandardDate(l.importDate);
                 let displayExpD = cleanToStandardDate(l.expiryDate);
                 tbody.innerHTML += `<tr><td>${l.timestamp}</td><td><b>[${l.pId}]</b> ${l.pName}</td><td><span class="badge ${l.type === 'IN' ? 'badge-in' : 'badge-out'}">${l.type === 'IN' ? '📥 นำเข้า' : '📤 นำออก'}</span></td><td><b>${l.qty}</b> พาเลท</td><td>${displayInD}</td><td>${displayExpD}</td><td style="text-align: center;"><button class="btn btn-warning" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="openEditLogModal('${l.logId}')">✏️ แก้ไข</button> <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteLog('${l.logId}')">🗑️ ลบ</button></td></tr>`;
@@ -907,7 +926,14 @@
             openModal('historyModal');
         }
 
-        function clearAllData() { if(confirm("⚠️ ล้างข้อมูลทั้งหมดทั้งเว็บและใน Google Sheets?")) { products = []; logs = []; localStorage.removeItem('stock_drivein_cache'); saveLocalData(); } }
+        function clearAllData() { 
+            if(confirm("⚠️ ล้างข้อมูลทั้งหมดทั้งเว็บและใน Google Sheets?")) { 
+                // เพิ่มการตรวจเช็ครหัสผ่านสี่ตัวตรงนี้
+                if (!validateDeletePermission()) return;
+                
+                products = []; logs = []; localStorage.removeItem('stock_drivein_cache'); saveLocalData(); 
+            } 
+        }
 
         function exportToExcel() {
             const chks = document.querySelectorAll('.report-item-chk:checked');
@@ -1032,7 +1058,7 @@
                                 <td style="text-align: right; width: 50%;"><b>วันที่ออกเอกสาร:</b> ${currentDate}</td>
                             </tr>
                             <tr>
-                                <td><b>ผู้รวบรวมข้อมูล:</b> แผนก Goods Receiving (GR)</td>
+                                <td><b>ผู้รวบรวมข้อมูล:</b> แมนก Goods Receiving (GR)</td>
                                 <td style="text-align: right;"><b>สถานะเอกสาร:</b> เอกสารทั่วไป (General documents)</td>
                             </tr>
                         </table>
