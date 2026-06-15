@@ -54,7 +54,6 @@
         .nav-btn:hover { background-color: #cbd5e1; color: #1e293b; }
         .nav-btn.active:hover { background-color: var(--primary-hover) !important; color: white !important; }
         
-        /* สไตล์ปุ่มออกจากระบบ */
         .logout-btn { background-color: #fee2e2; color: var(--danger); }
         .logout-btn:hover { background-color: #fca5a5; color: #991b1b; }
 
@@ -91,7 +90,7 @@
         .filter-group { display: flex; flex-direction: column; gap: 0.35rem; flex: 1; min-width: 180px; }
         .filter-group label { font-size: 0.9rem; font-weight: 500; color: #475569; }
         .filter-input { padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-size: 0.95rem; height: 44px; width: 100%; background-color: white; }
-        .report-btn-group { display: flex; gap: 0.5rem; width: 100%; }
+        .report-btn-group { display: flex; gap: 0.5rem; width: 100%; flex-wrap: wrap; }
         @media (min-width: 768px) { .report-btn-group { width: auto; margin-left: auto; } }
 
         .table-responsive { width: 100%; overflow-x: auto; background: white; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); -webkit-overflow-scrolling: touch; }
@@ -129,7 +128,6 @@
         .text-muted { color: #64748b; font-size: 0.85rem; font-weight: normal; }
         .empty-history { text-align: center; padding: 2rem; color: var(--gray); font-style: italic; }
 
-        /* หน้าต่างกรอกรหัสผ่าน */
         .login-modal { display: flex; background-color: #1e293b; z-index: 99999; }
         .login-content { text-align: center; max-width: 400px; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.3); }
 
@@ -150,7 +148,7 @@
 
     <div id="loginModal" class="modal login-modal">
         <div class="modal-content login-content">
-            <h2 style="border: none; padding: 0; text-align: center; margin-bottom: 0.5rem; color: var(--primary);">ระบบจัดการสินค้าคงคลัง GR<h2>
+            <h2 style="border: none; padding: 0; text-align: center; margin-bottom: 0.5rem; color: var(--primary);">ระบบจัดการสินค้าคงคลัง GR</h2>
             <p class="text-muted" style="margin-bottom: 1.5rem;">กรุณากรอกรหัสผ่านแผนกเพื่อเข้าใช้งาน</p>
             <form id="login-form" onsubmit="checkPassword(event)">
                 <div class="form-group">
@@ -296,6 +294,7 @@
                 </div>
                 <div class="report-btn-group">
                     <button class="btn btn-success" onclick="exportToExcel()">📊 Report Excel</button>
+                    <button class="btn btn-warning" onclick="exportMultipleCardControls()" style="color: white; font-weight: bold;">📊 Card Control</button>
                     <button class="btn btn-primary" onclick="exportToWord()">📝 Report Word</button>
                 </div>
             </div>
@@ -364,7 +363,7 @@
     <div id="historyModal" class="modal">
         <div class="modal-content modal-large">
             <button class="close-modal" onclick="closeModal('historyModal')">&times;</button>
-            <h3 id="history-modal-title">📈 ความเคลื่อนไความสินค้า</h3>
+            <h3 id="history-modal-title">📈 ความเคลื่อนไหวสินค้า</h3>
             <p id="history-modal-subtitle" class="text-muted"></p>
             <div class="table-responsive">
                 <table>
@@ -378,30 +377,23 @@
     <script>
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzFIehbfMXYTuvgazXvds1Vq5lf3IHRB2TYtclmB8SAttP28YIKHWwzVRyriKwRbFSR/exec"; 
         const APP_PASSWORD = "grkorat007";
-        
-        // 🔑 ตั้งค่ารหัสผ่านสำหรับการลบข้อมูลที่นี่
         const DELETE_PASSWORD = "1234";
 
         let products = [];
         let logs = [];
         let currentLogFilter = 'ALL'; 
 
-        // --- 🛠️ ฟังก์ชันตรวจสอบรหัสผ่านก่อนทำลายข้อมูลสต๊อก ---
         function validateDeletePermission() {
             const userPass = prompt("⚠️ เอกสารนี้สำคัญมาก! กรุณากรอกรหัสผ่านเพื่อยืนยันการลบข้อมูล:");
-            if (userPass === null) return false; // กดยกเลิก
-            if (userPass === DELETE_PASSWORD) {
-                return true;
-            } else {
-                alert("❌ รหัสผ่านไม่ถูกต้อง! ระบบปฏิเสธการลบข้อมูล");
-                return false;
-            }
+            if (userPass === null) return false;
+            if (userPass === DELETE_PASSWORD) return true;
+            alert("❌ รหัสผ่านไม่ถูกต้อง! ระบบปฏิเสธการลบข้อมูล");
+            return false;
         }
 
         function cleanToStandardDate(dateStr) {
             if (!dateStr) return "-";
             let dStr = dateStr.toString().trim();
-            
             if (dStr.indexOf("GMT") !== -1 || dStr.indexOf("เวลาอินโดจีน") !== -1) {
                 try {
                     const pDate = new Date(dStr);
@@ -413,7 +405,6 @@
                     }
                 } catch(e) {}
             }
-            
             if (dStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dStr;
             return dStr;
         }
@@ -443,7 +434,6 @@
             e.preventDefault();
             const inputPass = document.getElementById('app-password-input').value;
             const errorMsg = document.getElementById('login-error-msg');
-            
             if (inputPass === APP_PASSWORD) {
                 sessionStorage.setItem('gr_stock_login', 'true');
                 errorMsg.style.display = 'none';
@@ -481,35 +471,27 @@
             } else {
                 showLoading(true);
             }
-            
             try {
                 const response = await fetch(SCRIPT_URL);
                 const data = await response.json();
                 products = data.products || []; 
                 logs = data.logs || [];
-                
                 localStorage.setItem('stock_drivein_cache', JSON.stringify({ products, logs }));
                 renderAll();
-            } catch (error) { 
-                console.error("ซิงค์เบื้องหลังล้มเหลว กำลังใช้โหมดออฟไลน์:", error); 
-            } finally { 
-                showLoading(false); 
-            }
+            } catch (error) { console.error("ซิงค์ล้มเหลว ใช้โหมดออฟไลน์:", error); }
+            finally { showLoading(false); }
         }
 
         async function saveLocalData() {
             localStorage.setItem('stock_drivein_cache', JSON.stringify({ products, logs }));
             renderAll();
-            
             try {
                 fetch(SCRIPT_URL, { 
                     method: 'POST', 
                     body: JSON.stringify({ products, logs }), 
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
                 });
-            } catch (error) { 
-                alert("เกิดปัญหาในการส่งข้อมูลขึ้น Google Sheets แต่อุปกรณ์ของคุณบันทึกข้อมูลไว้เรียบร้อยแล้ว"); 
-            }
+            } catch (error) { alert("เกิดปัญหาในการส่งข้อมูลขึ้น Google Sheets แต่ระบบจำในเครื่องไว้แล้ว"); }
         }
 
         function switchPage(pageId) {
@@ -568,9 +550,7 @@
             if (dStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dStr; 
             if (!isNaN(dStr) && dStr.length >= 5) {
                 const dateObj = XLSX.SSF.parse_date_code(parseInt(dStr));
-                if(dateObj) {
-                    return `${dateObj.y}-${String(dateObj.m).padStart(2,'0')}-${String(dateObj.d).padStart(2,'0')}`;
-                }
+                if(dateObj) return `${dateObj.y}-${String(dateObj.m).padStart(2,'0')}-${String(dateObj.d).padStart(2,'0')}`;
             }
             return dStr;
         }
@@ -591,9 +571,7 @@
                     const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                     const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
                     if (jsonData.length === 0) { alert("ไม่พบข้อมูลสินค้าในไฟล์ Excel"); return; }
-                    
                     const timestamp = getStandardTimestamp();
-
                     jsonData.forEach(row => {
                         let id = findExcelValue(row, ['รหัสสินค้า', 'ProductID', 'id']);
                         let name = findExcelValue(row, ['ชื่อสินค้า', 'ProductName', 'name']);
@@ -601,12 +579,8 @@
                         let qty = parseInt(findExcelValue(row, ['จำนวนเริ่มต้น', 'InitialQty', 'qty', 'จำนวน']) || 0);
                         let importDate = cleanToStandardDate(formatExcelDate(findExcelValue(row, ['วันนำเข้า', 'date_in']))) || new Date().toISOString().split('T')[0];
                         let expiryDate = cleanToStandardDate(formatExcelDate(findExcelValue(row, ['วันหมดอายุ', 'date_exp']))) || new Date().toISOString().split('T')[0];
-                        
-                        id = id ? id.toString().trim() : ""; 
-                        name = name ? name.toString().trim() : "";
-                        
+                        id = id ? id.toString().trim() : ""; name = name ? name.toString().trim() : "";
                         if (!id || !name || perPallet <= 0 || products.some(p => p.id.toLowerCase() === id.toLowerCase())) return;
-
                         const lotsArr = qty > 0 ? [{ importDate, expiryDate, qty }] : [];
                         products.push({ id, name, perPallet, lots: lotsArr });
                         if(qty > 0) logs.unshift({ logId: "LOG-" + Date.now() + Math.random().toString(36).substr(2, 4), timestamp, pId: id, pName: name, type: 'IN', qty, importDate, expiryDate });
@@ -635,10 +609,8 @@
                         let importDate = cleanToStandardDate(formatExcelDate(findExcelValue(row, ['วันนำเข้า', 'lot_in'])));
                         let expiryDate = cleanToStandardDate(formatExcelDate(findExcelValue(row, ['วันหมดอายุ', 'lot_exp'])));
                         id = id ? id.toString().trim() : ""; type = type ? type.toString().trim().toUpperCase() : "";
-
                         const product = products.find(p => p.id.toLowerCase() === id.toLowerCase());
                         if (!product || qty <= 0 || (type !== 'IN' && type !== 'OUT')) return;
-
                         if (type === 'IN') {
                             let lot = product.lots.find(l => l.importDate === importDate && l.expiryDate === expiryDate);
                             if (lot) lot.qty += qty; else product.lots.push({ importDate, expiryDate, qty });
@@ -659,10 +631,7 @@
             const product = products.find(p => p.id === logObj.pId); if (!product) return;
             let lot = product.lots.find(l => cleanToStandardDate(l.importDate) === cleanToStandardDate(logObj.importDate) && cleanToStandardDate(l.expiryDate) === cleanToStandardDate(logObj.expiryDate));
             if (logObj.type === 'IN') { 
-                if (lot) {
-                    lot.qty -= logObj.qty; 
-                    if(lot.qty < 0) lot.qty = 0;
-                }
+                if (lot) { lot.qty -= logObj.qty; if(lot.qty < 0) lot.qty = 0; }
             } else { 
                 if (lot) lot.qty += logObj.qty; else product.lots.push({ importDate: cleanToStandardDate(logObj.importDate), expiryDate: cleanToStandardDate(logObj.expiryDate), qty: logObj.qty }); 
             }
@@ -670,20 +639,13 @@
 
         function deleteLog(logId) {
             const index = logs.findIndex(l => l.logId === logId); if (index === -1) return;
-            const targetLog = logs[index]; 
-            
-            // เพิ่มการตรวจเช็ครหัสผ่านสี่ตัวตรงนี้
             if (!validateDeletePermission()) return;
-            
-            rollbackStockValue(targetLog); logs.splice(index, 1); saveLocalData();
+            rollbackStockValue(logs[index]); logs.splice(index, 1); saveLocalData();
         }
 
         function clearAllLogs() {
-            if (!confirm("❌ ยืนยันการล้างประวัติ Log ทั้งหมดใน Google Sheets และเซ็ตสต๊อกสินค้าทั้งหมดเป็น 0?")) return;
-            
-            // เพิ่มการตรวจเช็ครหัสผ่านสี่ตัวตรงนี้
+            if (!confirm("❌ ยืนยันการล้างประวัติ Log ทั้งหมดสุทธิเป็น 0?")) return;
             if (!validateDeletePermission()) return;
-            
             products.forEach(p => p.lots = []); logs = []; saveLocalData();
         }
 
@@ -701,10 +663,8 @@
             const newQty = parseInt(document.getElementById('edit-log-qty').value);
             const newImportDate = cleanToStandardDate(document.getElementById('edit-log-import-date').value); 
             const newExpiryDate = cleanToStandardDate(document.getElementById('edit-log-expiry-date').value);
-            
             const index = logs.findIndex(l => l.logId === logId); if (index === -1) return;
             const oldLog = logs[index]; const product = products.find(p => p.id === oldLog.pId); if (!product) return;
-
             rollbackStockValue(oldLog);
             if (oldLog.type === 'IN') {
                 let lot = product.lots.find(l => l.importDate === newImportDate && l.expiryDate === newExpiryDate);
@@ -724,38 +684,17 @@
             const tbody = document.getElementById('items-table-body'); if(!tbody) return; tbody.innerHTML = '';
             const search = document.getElementById('search-items').value.toLowerCase();
             const sortBy = document.getElementById('items-sort-by').value;
-            
-            let filteredProducts = products.filter(p => 
-                p.id.toLowerCase().includes(search) || p.name.toLowerCase().includes(search)
-            );
-
-            if (sortBy === "id_asc") {
-                filteredProducts.sort((a, b) => a.id.localeCompare(b.id, undefined, {numeric: true, sensitivity: 'base'}));
-            } else if (sortBy === "name_asc") {
-                filteredProducts.sort((a, b) => a.name.localeCompare(b.name, 'th'));
-            } else if (sortBy === "per_pallet_desc") {
-                filteredProducts.sort((a, b) => b.perPallet - a.perPallet);
-            } else if (sortBy === "qty_desc") {
-                filteredProducts.sort((a, b) => {
-                    const totalA = a.lots.reduce((sum, l) => sum + l.qty, 0);
-                    const totalB = b.lots.reduce((sum, l) => sum + l.qty, 0);
-                    return totalB - totalA;
-                });
-            }
-
+            let filteredProducts = products.filter(p => p.id.toLowerCase().includes(search) || p.name.toLowerCase().includes(search));
+            if (sortBy === "id_asc") filteredProducts.sort((a, b) => a.id.localeCompare(b.id, undefined, {numeric: true, sensitivity: 'base'}));
+            else if (sortBy === "name_asc") filteredProducts.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+            else if (sortBy === "per_pallet_desc") filteredProducts.sort((a, b) => b.perPallet - a.perPallet);
+            else if (sortBy === "qty_desc") filteredProducts.sort((a, b) => b.lots.reduce((s,l)=>s+l.qty,0) - a.lots.reduce((s,l)=>s+l.qty,0));
             filteredProducts.forEach(p => {
                 const totalQty = p.lots.reduce((sum, l) => sum + l.qty, 0);
-                const totalMU = totalQty * (p.perPallet || 0); 
-                
                 tbody.innerHTML += `
                     <tr>
                         <td><b>${p.id}</b></td><td>${p.name}</td><td>${(p.perPallet || 0).toLocaleString()} MU</td>
-                        <td>
-                            <span class="badge ${totalQty > 0 ? 'badge-in' : 'badge-out'}">${totalQty} พาเลท</span>
-                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px; padding-left: 4px;">
-                                (${totalMU.toLocaleString()} MU)
-                            </div>
-                        </td>
+                        <td><span class="badge ${totalQty > 0 ? 'badge-in' : 'badge-out'}">${totalQty} พาเลท</span><div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">(${(totalQty * (p.perPallet || 0)).toLocaleString()} MU)</div></td>
                         <td>
                             <button class="btn btn-success" onclick="openStockActionModal('${p.id}', 'IN')">📥 นำเข้า</button>
                             <button class="btn btn-danger" onclick="openStockActionModal('${p.id}', 'OUT')" ${totalQty <= 0 ? 'disabled' : ''}>📤 นำออก</button>
@@ -771,9 +710,7 @@
             const filtered = logs.filter(l => (l.pName.toLowerCase().includes(search) || l.pId.toLowerCase().includes(search)) && (currentLogFilter === 'ALL' || l.type === currentLogFilter));
             if(filtered.length === 0) { tbody.innerHTML = `<tr><td colspan="7" class="empty-history">❌ ไม่พบประวัติ</td></tr>`; return; }
             filtered.forEach(l => {
-                let displayInD = cleanToStandardDate(l.importDate);
-                let displayExpD = cleanToStandardDate(l.expiryDate);
-                tbody.innerHTML += `<tr><td>${l.timestamp}</td><td><b>[${l.pId}]</b> ${l.pName}</td><td><span class="badge ${l.type === 'IN' ? 'badge-in' : 'badge-out'}">${l.type === 'IN' ? '📥 นำเข้า' : '📤 นำออก'}</span></td><td><b>${l.qty}</b> พาเลท</td><td>${displayInD}</td><td>${displayExpD}</td><td style="text-align: center;"><button class="btn btn-warning" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="openEditLogModal('${l.logId}')">✏️ แก้ไข</button> <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteLog('${l.logId}')">🗑️ ลบ</button></td></tr>`;
+                tbody.innerHTML += `<tr><td>${l.timestamp}</td><td><b>[${l.pId}]</b> ${l.pName}</td><td><span class="badge ${l.type === 'IN' ? 'badge-in' : 'badge-out'}">${l.type === 'IN' ? '📥 นำเข้า' : '📤 นำออก'}</span></td><td><b>${l.qty}</b> พาเลท</td><td>${cleanToStandardDate(l.importDate)}</td><td>${cleanToStandardDate(l.expiryDate)}</td><td style="text-align: center;"><button class="btn btn-warning" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="openEditLogModal('${l.logId}')">✏️ แก้ไข</button> <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteLog('${l.logId}')">🗑️ ลบ</button></td></tr>`;
             });
         }
 
@@ -784,13 +721,11 @@
                 if (p.id.toLowerCase().includes(search) || p.name.toLowerCase().includes(search)) {
                     p.lots.forEach(lot => {
                         if(lot.qty <= 0) return;
-                        const cleanInDate = cleanToStandardDate(lot.importDate);
-                        const cleanExpDate = cleanToStandardDate(lot.expiryDate);
-                        const diffDays = Math.ceil((new Date(cleanExpDate) - today) / (1000 * 60 * 60 * 24));
+                        const diffDays = Math.ceil((new Date(cleanToStandardDate(lot.expiryDate)) - today) / (1000 * 60 * 60 * 24));
                         let status = `<span class="badge badge-in">ปกติ</span>`;
                         if (diffDays <= 0) status = `<span class="badge badge-out">❌ หมดอายุ</span>`;
                         else if (diffDays <= 45) status = `<span class="badge badge-warning">⚠️ เหลือ ${diffDays} วัน</span>`;
-                        tbody.innerHTML += `<tr class="${diffDays <= 45 ? 'row-warning' : ''}"><td>${p.id}</td><td>${p.name}</td><td>${cleanInDate}</td><td>${cleanExpDate}</td><td><b>${lot.qty}</b> พาเลท</td><td>${status}</td></tr>`;
+                        tbody.innerHTML += `<tr class="${diffDays <= 45 ? 'row-warning' : ''}"><td>${p.id}</td><td>${p.name}</td><td>${cleanToStandardDate(lot.importDate)}</td><td>${cleanToStandardDate(lot.expiryDate)}</td><td><b>${lot.qty}</b> พาเลท</td><td>${status}</td></tr>`;
                     });
                 }
             });
@@ -798,49 +733,28 @@
 
         function renderReportTable() {
             const tbody = document.getElementById('report-table-body'); if(!tbody) return; tbody.innerHTML = '';
-            const start = document.getElementById('report-start-date').value; 
-            const end = document.getElementById('report-end-date').value;
+            const start = document.getElementById('report-start-date').value; const end = document.getElementById('report-end-date').value;
             const sortBy = document.getElementById('report-sort-by').value;
-            
             let reportData = [];
-            
             products.forEach(p => {
                 let sumIn = 0, sumOut = 0;
-                
                 logs.forEach(l => { 
                     const checkDate = cleanToStandardDate(l.importDate);
-                    if(l.pId === p.id && checkDate >= start && checkDate <= end) { 
-                        if(l.type === 'IN') sumIn += l.qty; else sumOut += l.qty; 
-                    } 
+                    if(l.pId === p.id && checkDate >= start && checkDate <= end) { if(l.type === 'IN') sumIn += l.qty; else sumOut += l.qty; } 
                 });
-                
                 const currentQty = p.lots.reduce((sum, l) => sum + l.qty, 0);
-                const totalPieces = currentQty * (p.perPallet || 0);
-                
-                reportData.push({ id: p.id, name: p.name, sumIn, sumOut, currentQty, totalPieces });
+                reportData.push({ id: p.id, name: p.name, sumIn, sumOut, currentQty, totalPieces: currentQty * (p.perPallet || 0) });
             });
-
-            if (sortBy === "id_asc") {
-                reportData.sort((a, b) => a.id.localeCompare(b.id, undefined, {numeric: true, sensitivity: 'base'}));
-            } else if (sortBy === "in_desc") {
-                reportData.sort((a, b) => b.sumIn - a.sumIn);
-            } else if (sortBy === "out_desc") {
-                reportData.sort((a, b) => b.sumOut - a.sumOut);
-            } else if (sortBy === "current_desc") {
-                reportData.sort((a, b) => b.currentQty - a.currentQty);
-            } else if (sortBy === "pieces_desc") {
-                reportData.sort((a, b) => b.totalPieces - a.totalPieces);
-            }
-
+            if (sortBy === "id_asc") reportData.sort((a, b) => a.id.localeCompare(b.id, undefined, {numeric: true, sensitivity: 'base'}));
+            else if (sortBy === "in_desc") reportData.sort((a, b) => b.sumIn - a.sumIn);
+            else if (sortBy === "out_desc") reportData.sort((a, b) => b.sumOut - a.sumOut);
+            else if (sortBy === "current_desc") reportData.sort((a, b) => b.currentQty - a.currentQty);
+            else if (sortBy === "pieces_desc") reportData.sort((a, b) => b.totalPieces - a.totalPieces);
             reportData.forEach(item => {
                 tbody.innerHTML += `<tr>
                     <td class="col-checkbox"><input type="checkbox" class="chk-box report-item-chk" data-id="${item.id}" checked></td>
-                    <td>${item.id}</td>
-                    <td>${item.name}</td>
-                    <td>${item.sumIn}</td>
-                    <td>${item.sumOut}</td>
-                    <td><span class="badge badge-in">${item.currentQty}</span></td>
-                    <td>${item.totalPieces.toLocaleString()}</td>
+                    <td>${item.id}</td><td>${item.name}</td><td>${item.sumIn}</td><td>${item.sumOut}</td>
+                    <td><span class="badge badge-in">${item.currentQty}</span></td><td>${item.totalPieces.toLocaleString()}</td>
                 </tr>`;
             });
         }
@@ -848,14 +762,13 @@
         function toggleSelectAllReports(master) { document.querySelectorAll('.report-item-chk').forEach(chk => chk.checked = master.checked); }
 
         function checkExpiryAlert() {
-            const MathDiff = Math; const today = new Date(); const box = document.getElementById('expiry-items-box'); const tbody = document.getElementById('expiry-items-table-body');
+            const today = new Date(); const box = document.getElementById('expiry-items-box'); const tbody = document.getElementById('expiry-items-table-body');
             if(!tbody || !box) return; tbody.innerHTML = ''; let count = 0;
             products.forEach(p => {
                 p.lots.forEach(lot => {
                     if (lot.qty > 0) {
-                        const checkExpDate = cleanToStandardDate(lot.expiryDate);
-                        const diff = MathDiff.ceil((new Date(checkExpDate) - today) / (1000 * 60 * 60 * 24));
-                        if (diff <= 45) { count++; tbody.innerHTML += `<tr><td><b>${p.id}</b></td><td>${p.name}</td><td style="color: #dc2626;">${checkExpDate}</td><td><b>${lot.qty}</b> พาเลท</td><td><span class="badge ${diff <= 0 ? 'badge-out':'badge-warning'}">${diff<=0?'❌ หมดอายุ':'⚠️ เหลือ '+diff+' วัน'}</span></td></tr>`; }
+                        const diff = Math.ceil((new Date(cleanToStandardDate(lot.expiryDate)) - today) / (1000 * 60 * 60 * 24));
+                        if (diff <= 45) { count++; tbody.innerHTML += `<tr><td><b>${p.id}</b></td><td>${p.name}</td><td style="color: #dc2626;">${cleanToStandardDate(lot.expiryDate)}</td><td><b>${lot.qty}</b> พาเลท</td><td><span class="badge ${diff <= 0 ? 'badge-out':'badge-warning'}">${diff<=0?'❌ หมดอายุ':'⚠️ เหลือ '+diff+' วัน'}</span></td></tr>`; }
                     }
                 });
             });
@@ -874,9 +787,7 @@
             } else {
                 lotGroup.style.display = 'block'; document.getElementById('import-date-group').style.display = 'none'; document.getElementById('expiry-date-group').style.display = 'none';
                 const select = document.getElementById('modal-lot-select'); select.innerHTML = '';
-                product.lots.forEach((l, idx) => { 
-                    if(l.qty > 0) select.innerHTML += `<option value="${idx}">หมดอายุ: ${cleanToStandardDate(l.expiryDate)} (คงเหลือ ${l.qty} พาเลท)</option>`; 
-                });
+                product.lots.forEach((l, idx) => { if(l.qty > 0) select.innerHTML += `<option value="${idx}">หมดอายุ: ${cleanToStandardDate(l.expiryDate)} (คงเหลือ ${l.qty} พาเลท)</option>`; });
                 updateMaxQtyField();
             }
             openModal('stockModal');
@@ -894,22 +805,17 @@
             e.preventDefault();
             const pId = document.getElementById('modal-p-id').value; const action = document.getElementById('modal-action-type').value; const qty = parseInt(document.getElementById('modal-qty').value);
             const product = products.find(p => p.id === pId); if(!product) return;
-            
             const timestamp = getStandardTimestamp();
             let inD = '', expD = '';
-
             if (action === 'IN') {
-                inD = cleanToStandardDate(document.getElementById('modal-import-date').value); 
-                expD = cleanToStandardDate(document.getElementById('modal-expiry-date').value);
+                inD = cleanToStandardDate(document.getElementById('modal-import-date').value); expD = cleanToStandardDate(document.getElementById('modal-expiry-date').value);
                 if(!expD) { alert('กรุณาระบุวันหมดอายุด้วยครับ'); return; }
                 let lot = product.lots.find(l => cleanToStandardDate(l.importDate) === inD && cleanToStandardDate(l.expiryDate) === expD);
                 if(lot) lot.qty += qty; else product.lots.push({ importDate: inD, expiryDate: expD, qty });
             } else {
                 const idx = document.getElementById('modal-lot-select').value; const lot = product.lots[idx];
                 if(!lot || lot.qty < qty) { alert('สินค้าในล็อตที่เลือกไม่พอครับ!'); return; }
-                lot.qty -= qty; 
-                inD = cleanToStandardDate(lot.importDate); 
-                expD = cleanToStandardDate(lot.expiryDate);
+                lot.qty -= qty; inD = cleanToStandardDate(lot.importDate); expD = cleanToStandardDate(lot.expiryDate);
             }
             logs.unshift({ logId: "LOG-"+Date.now(), timestamp, pId, pName: product.name, type: action, qty, importDate: inD, expiryDate: expD });
             closeModal('stockModal'); saveLocalData();
@@ -926,75 +832,110 @@
             openModal('historyModal');
         }
 
-        function clearAllData() { 
-            if(confirm("⚠️ ล้างข้อมูลทั้งหมดทั้งเว็บและใน Google Sheets?")) { 
-                // เพิ่มการตรวจเช็ครหัสผ่านสี่ตัวตรงนี้
-                if (!validateDeletePermission()) return;
-                
-                products = []; logs = []; localStorage.removeItem('stock_drivein_cache'); saveLocalData(); 
-            } 
+        /* 📊 ฟังก์ชันใหม่: ดึงประวัติแบบมัลติไอเทมสร้างเป็นแผ่นชีทแยกของแต่ละไอเทมใน Excel เดียวกัน */
+        function exportMultipleCardControls() {
+            const selectedCheckboxes = document.querySelectorAll('.report-item-chk:checked');
+            if (selectedCheckboxes.length === 0) {
+                alert('⚠️ กรุณาติ๊กเลือกรายการสินค้าในตารางอย่างน้อย 1 รายการก่อนครับ');
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const workbook = XLSX.utils.book_new();
+                let hasData = false;
+
+                selectedCheckboxes.forEach(chk => {
+                    const productId = chk.getAttribute('data-id');
+                    const product = products.find(p => p.id === productId);
+                    if (!product) return;
+
+                    hasData = true;
+                    // ดึง log และกลับด้านลำดับเวลาเก่า -> ใหม่เพื่อหาผลรวมสะสม (Card Control)
+                    const productLogs = logs.filter(l => l.pId === productId).reverse();
+
+                    const rows = [
+                        ["บัตรควบคุมประวัติความเคลื่อนไหวสินค้า (Product Card Control)"],
+                        [`รหัสสินค้า: ${product.id} | ชื่อรายการ: ${product.name} | ขนาดพาเลท: ${(product.perPallet || 0).toLocaleString()} MU`],
+                        [`วันที่ดึงรายงาน: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}`],
+                        [],
+                        ["วัน-เวลาที่ทำรายการ", "ประเภทรายการ", "ล็อตวันนำเข้า", "ล็อตวันหมดอายุ", "รับเข้า (พาเลท)", "จ่ายออก (พาเลท)", "ยอดคงเหลือสะสม (พาเลท)", "คงเหลือสะสม (MU)"]
+                    ];
+
+                    let runningBalance = 0;
+                    productLogs.forEach(l => {
+                        const qty = Number(l.qty) || 0;
+                        let incoming = 0, outgoing = 0;
+                        if (l.type === 'IN') { incoming = qty; runningBalance += qty; } 
+                        else { outgoing = qty; runningBalance -= qty; }
+
+                        rows.push([
+                            l.timestamp,
+                            l.type === 'IN' ? '📥 นำเข้า' : '📤 นำออก',
+                            cleanToStandardDate(l.importDate),
+                            cleanToStandardDate(l.expiryDate),
+                            incoming,
+                            outgoing,
+                            runningBalance,
+                            runningBalance * (product.perPallet || 0)
+                        ]);
+                    });
+
+                    if(productLogs.length === 0) {
+                        rows.push(["-", "ไม่มีประวัติการทำรายการบนระบบ", "-", "-", 0, 0, 0, 0]);
+                    }
+
+                    const ws = XLSX.utils.aoa_to_sheet(rows);
+                    ws['!cols'] = [
+                        { wch: 22 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+                        { wch: 16 }, { wch: 16 }, { wch: 24 }, { wch: 20 }
+                    ];
+
+                    // ลิมิตชื่อแผ่นงานไม่เกิน 31 ตัวอักษรตามมาตรฐาน Excel
+                    let sheetName = `${product.id}`.substring(0, 31);
+                    XLSX.utils.book_append_sheet(workbook, ws, sheetName);
+                });
+
+                if (hasData) {
+                    XLSX.writeFile(workbook, `Card_Control_GroupReport_${new Date().toISOString().split('T')[0]}.xlsx`);
+                }
+            } catch (err) {
+                alert("เกิดข้อผิดพลาดในการสร้างรายงาน!");
+                console.error(err);
+            } finally {
+                showLoading(false);
+            }
         }
 
         function exportToExcel() {
             const chks = document.querySelectorAll('.report-item-chk:checked');
-            if (chks.length === 0) { 
-                alert('กรุณาเลือกรายการสินค้าอย่างน้อย 1 รายการก่อนส่งออกครับ'); 
-                return; 
-            }
-
+            if (chks.length === 0) { alert('กรุณาเลือกรายการสินค้าอย่างน้อย 1 รายการก่อนส่งออกครับ'); return; }
             const startD = document.getElementById('report-start-date').value || "-";
             const endD = document.getElementById('report-end-date').value || "-";
-
             const rows = [
                 ["รายงานข้อมูลสถานะสินค้าคงคลังเชิงลึก (Drive-in Warehouse Report)"],
                 ["ช่วงวันที่ตรวจสอบ: " + startD + " ถึง " + endD + " | วันที่ดึงข้อมูล: " + new Date().toLocaleDateString('th-TH')],
                 [], 
                 ["ลำดับ", "รหัสสินค้า", "ชื่อรายการสินค้า", "ยอดนำเข้าสะสม (พาเลท)", "ยอดนำออกสะสม (พาเลท)", "ยอดคงเหลือสุทธิ (พาเลท)", "ปริมาณสินค้ารวม (MU)"]
             ];
-
             let rowIndex = 1;
             chks.forEach(chk => {
                 const tds = chk.closest('tr').querySelectorAll('td');
                 rows.push([
-                    rowIndex++,                                     
-                    tds[1].innerText,                               
-                    tds[2].innerText,                               
-                    Number(tds[3].innerText.replace(/,/g,'')),      
-                    Number(tds[4].innerText.replace(/,/g,'')),      
-                    Number(tds[5].innerText.replace(/[^0-9]/g,'')),    
-                    Number(tds[6].innerText.replace(/,/g,''))       
+                    rowIndex++, tds[1].innerText, tds[2].innerText,                               
+                    Number(tds[3].innerText.replace(/,/g,'')), Number(tds[4].innerText.replace(/,/g,'')),      
+                    Number(tds[5].innerText.replace(/[^0-9]/g,'')), Number(tds[6].innerText.replace(/,/g,''))       
                 ]);
             });
-
-            const totalRowIndex = rows.length + 1;
-            const lastDataRow = totalRowIndex - 1;
-            
-            rows.push([
-                "", "", "รวมทั้งสิ้น (Total)", 
-                `=SUM(D5:D${lastDataRow})`, 
-                `=SUM(E5:E${lastDataRow})`, 
-                `=SUM(F5:F${lastDataRow})`, 
-                `=SUM(G5:G${lastDataRow})`
-            ]);
-
-            const ws = XLSX.utils.aoa_to_sheet(rows);
-            const wb = XLSX.utils.book_new();
-            
-            ws['!cols'] = [
-                { wch: 6 },   
-                { wch: 15 },  
-                { wch: 35 },  
-                { wch: 22 },  
-                { wch: 22 },  
-                { wch: 22 },  
-                { wch: 20 }   
-            ];
-
+            const totalRowIndex = rows.length + 1; const lastDataRow = totalRowIndex - 1;
+            rows.push(["", "", "รวมทั้งสิ้น (Total)", `=SUM(D5:D${lastDataRow})`, `=SUM(E5:E${lastDataRow})`, `=SUM(F5:F${lastDataRow})`, `=SUM(G5:G${lastDataRow})`]);
+            const ws = XLSX.utils.aoa_to_sheet(rows); const wb = XLSX.utils.book_new();
+            ws['!cols'] = [{ wch: 6 }, { wch: 15 }, { wch: 35 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 20 }];
             XLSX.utils.book_append_sheet(wb, ws, "Inventory_Analysis_Report");
             XLSX.writeFile(wb, `Inventory_Analysis_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
         }
 
-        function exportToWord() {
+function exportToWord() {
             const chks = document.querySelectorAll('.report-item-chk:checked');
             if (chks.length === 0) { alert('กรุณาเลือกรายการสินค้าอย่างน้อย 1 รายการก่อนส่งออกครับ'); return; }
 
