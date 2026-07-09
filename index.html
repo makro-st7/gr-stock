@@ -266,6 +266,11 @@
                 <div class="search-box">
                     <input type="text" id="search-levels" class="search-input" placeholder="ค้นหาล็อตด้วย รหัสสินค้า หรือ ชื่อสินค้า..." oninput="renderLevels()">
                 </div>
+                <div class="btn-group">
+                    <input type="file" id="excel-import-lots" class="file-input-hidden" accept=".xlsx, .xls" onchange="importLotsFromExcel(this)">
+                    <button class="btn btn-info" onclick="document.getElementById('excel-import-lots').click()">📥 Import Lot Excel</button>
+                    <button class="btn btn-success" onclick="exportLotsToExcel()">📊 Export Lot Excel</button>
+                </div>
             </div>
             <div class="table-responsive">
                 <table>
@@ -391,9 +396,8 @@
         let logs = [];
         let currentLogFilter = 'ALL'; 
         
-        // เพิ่มตัวแปรสำหรับระบบแบ่งหน้า (Pagination) หน้า Log เพื่อความเร็วสูงสุด
         let currentLogPage = 1;
-        const logsPerPage = 30; // แสดงหน้าละ 30 รายการ ป้องกันเบราว์เซอร์ค้าง
+        const logsPerPage = 30; 
 
         function validateDeletePermission() {
             const userPass = prompt("⚠️ เอกสารนี้สำคัญมาก! กรุณากรอกรหัสผ่านเพื่อยืนยันการลบข้อมูล:");
@@ -496,7 +500,7 @@
 
         async function saveLocalData() {
             localStorage.setItem('stock_drivein_cache', JSON.stringify({ products, logs }));
-            renderActivePageOnly(); // 🔥 แก้จุดบกพร่อง: วาดใหม่เฉพาะหน้าปัจจุบัน ไม่วาดซ้ำซ้อน
+            renderActivePageOnly(); 
             try {
                 fetch(SCRIPT_URL, { 
                     method: 'POST', 
@@ -506,7 +510,6 @@
             } catch (error) { alert("เกิดปัญหาในการส่งข้อมูลขึ้น Google Sheets แต่ระบบจำในเครื่องไว้แล้ว"); }
         }
 
-        // 🔥 แก้ไขระบบสลับหน้าให้ประหยัดทรัพยากร: เลือกวาดเฉพาะหน้าตามคำสั่งกดเป้าหมาย
         function switchPage(pageId) {
             document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -514,7 +517,6 @@
             const currentBtn = Array.from(document.querySelectorAll('.nav-btn')).find(btn => btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(pageId));
             if(currentBtn) currentBtn.classList.add('active');
             
-            // เรียกฟังก์ชันเรนเดอร์เฉพาะหน้านั้นๆ
             if (pageId === 'items-page') {
                 renderItems();
                 checkExpiryAlert();
@@ -541,7 +543,6 @@
             }
         }
 
-        // ฟังก์ชัน Render รวมดั้งเดิมถูกปรับให้ฉลาดขึ้น
         function renderAll() {
             renderActivePageOnly();
         }
@@ -767,7 +768,6 @@
             tbody.innerHTML = htmlBuffer;
         }
 
-        // 🔥 แก้ไขระบบ Render Log: เพิ่มระบบแบ่งหน้าและสร้าง HTML แบบรวบยอดครั้งเดียว (เร็วขึ้น 10 เท่า)
         function renderLogs() {
             const tbody = document.getElementById('logs-table-body'); if(!tbody) return; tbody.innerHTML = '';
             const search = document.getElementById('search-logs').value.toLowerCase();
@@ -781,7 +781,6 @@
                 return; 
             }
             
-            // คำนวณแถวที่ต้องแสดงผลตามหน้าปัจจุบัน
             const totalPages = Math.ceil(filtered.length / logsPerPage);
             if (currentLogPage > totalPages) currentLogPage = totalPages;
             if (currentLogPage < 1) currentLogPage = 1;
@@ -1018,7 +1017,7 @@
             chks.forEach(chk => {
                 const tds = chk.closest('tr').querySelectorAll('td');
                 rows.push([
-                    rowIndex++, tds[1].innerText, tds[2].innerText,                               
+                    rowIndex++, tds[1].innerText, tds[2].innerText,                                
                     Number(tds[3].innerText.replace(/,/g,'')), Number(tds[4].innerText.replace(/,/g,'')),      
                     Number(tds[5].innerText.replace(/[^0-9]/g,'')), Number(tds[6].innerText.replace(/,/g,''))       
                 ]);
@@ -1110,7 +1109,7 @@
                                     <th style="width: 12%;">คงเหลือสุทธิ<br>(พาเลท)</th>
                                     <th style="width: 13%; text-align: right;">ปริมาณรวม (MU)</th>
                                 </tr>
-                            </thead>
+                            </head>
                             <tbody>
                                 ${tableRowsHtml}
                                 <tr class="total-row">
@@ -1152,6 +1151,129 @@
 
             } catch (error) { alert("เกิดข้อผิดพลาดในการสร้างไฟล์เอกสาร Word!"); }
             finally { showLoading(false); }
+        }
+
+        // ===================================================
+        // ฟังก์ชันระบบย่อย: ส่งออกข้อมูลและนำเข้าข้อมูล "ระดับล็อตสินค้า" เชิงลึก
+        // ===================================================
+
+        function exportLotsToExcel() {
+            const today = new Date();
+            const rows = [
+                ["รายงานข้อมูลล็อตสินค้าและวันหมดอายุคงเหลือ (Product Lots Expiry Report)"],
+                ["วันที่ดึงรายงาน: " + new Date().toLocaleDateString('th-TH') + " " + new Date().toLocaleTimeString('th-TH')],
+                [],
+                ["รหัสสินค้า", "ชื่อสินค้า", "วันนำเข้า (YYYY-MM-DD)", "วันหมดอายุ (YYYY-MM-DD)", "จำนวนคงเหลือ (พาเลท)", "อายุคงเหลือ (วัน)"]
+            ];
+
+            let hasData = false;
+            products.forEach(p => {
+                if(p.lots && p.lots.length > 0) {
+                    p.lots.forEach(lot => {
+                        if (lot.qty <= 0) return; 
+                        hasData = true;
+                        const diffDays = Math.ceil((new Date(cleanToStandardDate(lot.expiryDate)) - today) / (1000 * 60 * 60 * 24));
+                        
+                        rows.push([
+                            p.id,
+                            p.name,
+                            cleanToStandardDate(lot.importDate),
+                            cleanToStandardDate(lot.expiryDate),
+                            Number(lot.qty),
+                            diffDays <= 0 ? "หมดอายุแล้ว" : diffDays
+                        ]);
+                    });
+                }
+            });
+
+            if (!hasData) {
+                alert("⚠️ ไม่มีข้อมูลล็อตสินค้าที่คงเหลือในระบบให้ส่งออกได้");
+                return;
+            }
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            
+            ws['!cols'] = [
+                { wch: 15 }, { wch: 35 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 15 }
+            ];
+
+            XLSX.utils.book_append_sheet(wb, ws, "Lots_Expiry_Report");
+            XLSX.writeFile(wb, `Lots_Balance_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+        }
+
+        function importLotsFromExcel(input) {
+            if (!input.files || input.files.length === 0) return;
+            if (!confirm("⚠️ ข้อควรระวัง: การนำเข้าข้อมูลล็อตจะเคลียร์จำนวนล็อตเดิมของสินค้านั้นๆ ออกทั้งหมด และเขียนทับตามไฟล์ Excel ล่าสุดนี้ทันที คุณต้องการดำเนินการต่อใช่หรือไม่?")) {
+                input.value = '';
+                return;
+            }
+
+            const file = input.files[0];
+            const reader = new FileReader();
+            showLoading(true);
+
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { range: 3 }); 
+
+                    if (jsonData.length === 0) {
+                        alert("❌ ไม่พบโครงสร้างข้อมูลล็อตสินค้าในไฟล์ Excel");
+                        return;
+                    }
+
+                    let tempLotsMap = {};
+
+                    jsonData.forEach(row => {
+                        let id = findExcelValue(row, ['รหัสสินค้า', 'ProductID', 'id']);
+                        let importDate = cleanToStandardDate(formatExcelDate(findExcelValue(row, ['วันนำเข้า (YYYY-MM-DD)', 'วันนำเข้า', 'date_in'])));
+                        let expiryDate = cleanToStandardDate(formatExcelDate(findExcelValue(row, ['วันหมดอายุ (YYYY-MM-DD)', 'วันหมดอายุ', 'date_exp'])));
+                        let qty = parseInt(findExcelValue(row, ['จำนวนคงเหลือ (พาเลท)', 'จำนวนคงเหลือ', 'qty', 'จำนวน']) || 0);
+
+                        if (!id) return;
+                        id = id.toString().trim();
+
+                        if (qty > 0 && importDate && expiryDate) {
+                            if (!tempLotsMap[id]) {
+                                tempLotsMap[id] = [];
+                            }
+                            let existingLot = tempLotsMap[id].find(l => l.importDate === importDate && l.expiryDate === expiryDate);
+                            if (existingLot) {
+                                existingLot.qty += qty;
+                            } else {
+                                tempLotsMap[id].push({ importDate, expiryDate, qty });
+                            }
+                        }
+                    });
+
+                    // เคลียร์ล็อตเฉพาะสินค้าที่มีการอัปเดตในไฟล์ Excel
+                    let updatedCount = 0;
+                    for (let pId in tempLotsMap) {
+                        const product = products.find(p => p.id.toString().toLowerCase() === pId.toLowerCase());
+                        if (product) {
+                            product.lots = tempLotsMap[pId];
+                            updatedCount++;
+                        }
+                    }
+
+                    if (updatedCount > 0) {
+                        saveLocalData();
+                        alert(`📥 อัปเดตข้อมูลล็อตสินค้าคืนสู่ระบบสำเร็จทั้งหมด ${updatedCount} รายการสินค้า`);
+                    } else {
+                        alert("⚠️ ไม่พบรหัสสินค้าในระบบที่ตรงกับไฟล์ Excel (โปรดเพิ่มสินค้าที่หน้า Items ก่อน)");
+                    }
+
+                } catch (err) {
+                    console.error(err);
+                    alert("❌ เกิดข้อผิดพลาดในขบวนการอ่านไฟล์ Excel");
+                } finally {
+                    showLoading(false);
+                    input.value = ''; 
+                }
+            };
+            reader.readAsArrayBuffer(file);
         }
 
         window.onload = checkLoginStatus;
