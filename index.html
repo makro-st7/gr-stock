@@ -1070,16 +1070,72 @@
                         <meta charset='utf-8'>
                         <title>Stock Analysis Report</title>
                         <style>
-                            body { font-family: 'Sarabun', 'TH Sarabun PSK', Arial, sans-serif; line-height: 1.6; color: #1f2937; padding: 20px; }
-                            .header-container { text-align: center; border-bottom: 3px double #1b365d; padding-bottom: 15px; margin-bottom: 25px; }
-                            .report-title { color: #1b365d; font-size: 24px; font-weight: bold; margin: 0 0 5px 0; }
-                            .report-subtitle { color: #4b5563; font-size: 16px; margin: 0; }
-                            .meta-info-table { width: 100%; border: none; margin-bottom: 20px; font-size: 14px; color: #374151; }
-                            table.data-table { width: 100%; border-collapse: collapse; margin-top: 15px; box-shadow: 0 2px 3px rgba(0,0,0,0.05); }
-                            th { background-color: #1b365d; color: #ffffff; padding: 14px 10px; font-weight: bold; font-size: 14px; text-align: center; border: 1px solid #1b365d; }
-                            .total-row { background-color: #f8fafc; font-weight: bold; border-top: 2px solid #1b365d; border-bottom: 3px double #1b365d; }
-                            .approval-section { margin-top: 60px; width: 100%; font-size: 14px; }
-                            .approval-box { text-align: center; padding-top: 50px; width: 45%; }
+                            @page {
+                                size: A4;
+                                margin: 1in 1in 1in 1in;
+                                mso-header-margin:.5in;
+                                mso-footer-margin:.5in;
+                            }
+                            body { 
+                                font-family: 'Sarabun', 'TH Sarabun PSK', Arial, sans-serif; 
+                                line-height: 1.5; 
+                                color: #1f2937; 
+                            }
+                            .header-container { 
+                                text-align: center; 
+                                border-bottom: 3px double #1b365d; 
+                                padding-bottom: 10px; 
+                                margin-bottom: 20px; 
+                                page-break-after: avoid; /* ป้องกันการตัดหน้าหลังหัวข้อ */
+                            }
+                            .report-title { color: #1b365d; font-size: 22px; font-weight: bold; margin: 0 0 5px 0; }
+                            .report-subtitle { color: #4b5563; font-size: 14px; margin: 0; }
+                            
+                            .meta-info-table { 
+                                width: 100%; 
+                                border-collapse: collapse; 
+                                margin-bottom: 15px; 
+                                font-size: 14px; 
+                                color: #374151; 
+                            }
+                            
+                            table.data-table { 
+                                width: 100%; 
+                                border-collapse: collapse; 
+                                margin-top: 10px; 
+                                -fs-table-paginate: paginate;
+                                page-break-inside: auto; /* อนุญาตให้ตารางตัดขึ้นหน้าใหม่ด้านในได้ */
+                            }
+                            tr { 
+                                page-break-inside: avoid; /* ห้ามตัดกลางแถวเด็ดขาด */
+                                page-break-after: auto; 
+                            }
+                            th { 
+                                background-color: #1b365d; 
+                                color: #ffffff; 
+                                padding: 10px 8px; 
+                                font-weight: bold; 
+                                font-size: 14px; 
+                                text-align: center; 
+                                border: 1px solid #cbd5e1; 
+                            }
+                            td {
+                                padding: 8px; 
+                                border: 1px solid #cbd5e1; 
+                            }
+                            .total-row { 
+                                background-color: #f8fafc; 
+                                font-weight: bold; 
+                                border-top: 2px solid #1b365d; 
+                                border-bottom: 3px double #1b365d; 
+                            }
+                            .approval-section { 
+                                margin-top: 40px; 
+                                width: 100%; 
+                                font-size: 14px;
+                                page-break-inside: avoid; /* ห้ามแยกส่วนเซ็นชื่อออกจากกัน */
+                            }
+                            .approval-box { text-align: center; padding-top: 40px; width: 45%; }
                         </style>
                     </head>
                     <body>
@@ -1090,50 +1146,49 @@
 
                         <table class="meta-info-table">
                             <tr>
-                                <td style="width: 50%;"><b>ประจำงวดวันที่:</b> ตั้งแต่ ${startD} ถึง ${endD}</td>
-                                <td style="text-align: right; width: 50%;"><b>วันที่ออกเอกสาร:</b> ${currentDate}</td>
+                                <td style="width: 50%; border: none; padding: 4px 0;"><b>ประจำงวดวันที่:</b> ตั้งแต่ ${startD} ถึง ${endD}</td>
+                                <td style="text-align: right; width: 50%; border: none; padding: 4px 0;"><b>วันที่ออกเอกสาร:</b> ${currentDate}</td>
                             </tr>
                             <tr>
-                                <td><b>ผู้รวบรวมข้อมูล:</b> แผนก Goods Receiving (GR)</td>
-                                <td style="text-align: right;"><b>สถานะเอกสาร:</b> เอกสารทั่วไป (General documents)</td>
+                                <td style="border: none; padding: 4px 0;"><b>ผู้รวบรวมข้อมูล:</b> แผนก Goods Receiving (GR)</td>
+                                <td style="text-align: right; border: none; padding: 4px 0;"><b>สถานะเอกสาร:</b> เอกสารทั่วไป (General documents)</td>
                             </tr>
                         </table>
 
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 12%;">รหัสสินค้า</th>
-                                    <th style="width: 33%; text-align: left;">ชื่อรายการสินค้า</th>
-                                    <th style="width: 15%;">นำเข้าสะสม<br>(พาเลท)</th>
-                                    <th style="width: 15%;">นำออกสะสม<br>(พาเลท)</th>
+                                    <th style="width: 15%;">รหัสสินค้า</th>
+                                    <th style="width: 35%; text-align: left;">ชื่อรายการสินค้า</th>
+                                    <th style="width: 13%;">นำเข้าสะสม<br>(พาเลท)</th>
+                                    <th style="width: 13%;">นำออกสะสม<br>(พาเลท)</th>
                                     <th style="width: 12%;">คงเหลือสุทธิ<br>(พาเลท)</th>
-                                    <th style="width: 13%; text-align: right;">ปริมาณรวม (MU)</th>
+                                    <th style="width: 12%; text-align: right;">ปริมาณรวม (MU)</th>
                                 </tr>
-                            </head>
+                            </thead>
                             <tbody>
                                 ${tableRowsHtml}
                                 <tr class="total-row">
-                                    <td colspan="2" style="padding: 12px; border: 1px solid #cbd5e1; text-align: center;">รวมทั้งสิ้น (Total Summarized)</td>
-                                    <td style="padding: 12px; border: 1px solid #cbd5e1; text-align: center;">${totalIn.toLocaleString()}</td>
-                                    <td style="padding: 12px; border: 1px solid #cbd5e1; text-align: center;">${totalOut.toLocaleString()}</td>
-                                    <td style="padding: 12px; border: 1px solid #cbd5e1; text-align: center; color: #16a34a;">${totalBal.toLocaleString()}</td>
-                                    <td style="padding: 12px; border: 1px solid #cbd5e1; text-align: right;">${totalMU.toLocaleString()}</td>
+                                    <td colspan="2" style="padding: 12px; text-align: center;">รวมทั้งสิ้น (Total Summarized)</td>
+                                    <td style="padding: 12px; text-align: center;">${totalIn.toLocaleString()}</td>
+                                    <td style="padding: 12px; text-align: center;">${totalOut.toLocaleString()}</td>
+                                    <td style="padding: 12px; text-align: center; color: #16a34a;">${totalBal.toLocaleString()}</td>
+                                    <td style="padding: 12px; text-align: right;">${totalMU.toLocaleString()}</td>
                                 </tr>
                             </tbody>
                         </table>
 
-                        <br><br>
-                        <table class="approval-section" align="center">
+                        <table class="approval-section">
                             <tr>
-                                <td class="approval-box" style="float: left;">
-                                    ลงชื่อ.......................................................... ผู้ตรวจสอบ<br>
-                                    (..........................................................)<br>
+                                <td class="approval-box" style="border: none; width: 45%;">
+                                    ลงชื่อ.......................................................... ผู้ตรวจสอบ<br><br>
+                                    (..........................................................)<br><br>
                                     ตำแหน่ง ..........................................................
                                 </td>
-                                <td style="width: 10%;"></td>
-                                <td class="approval-box" style="float: right;">
-                                    ลงชื่อ.......................................................... ผู้อนุมัติ<br>
-                                    (..........................................................)<br>
+                                <td style="width: 10%; border: none;"></td>
+                                <td class="approval-box" style="border: none; width: 45%;">
+                                    ลงชื่อ.......................................................... ผู้อนุมัติ<br><br>
+                                    (..........................................................)<br><br>
                                     ตำแหน่ง ..........................................................
                                 </td>
                             </tr>
