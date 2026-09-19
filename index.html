@@ -276,7 +276,7 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>วันนำเข้า</th><th>วันหมดอายุ</th><th>จำนวนคงเหลือใน Lot</th><th>สถานะ Lot</th>
+                            <th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>วันนำเข้า</th><th>วันหมดอายุ</th><th>จำนวนคงเหลือใน Lot</th><th>จำนวน MU รวม</th><th>สถานะ Lot</th>
                         </tr>
                     </thead>
                     <tbody id="levels-table-body"></tbody>
@@ -812,7 +812,18 @@
                         let status = `<span class="badge badge-in">ปกติ</span>`;
                         if (diffDays <= 0) status = `<span class="badge badge-out">❌ หมดอายุ</span>`;
                         else if (diffDays <= 45) status = `<span class="badge badge-warning">⚠️ เหลือ ${diffDays} วัน</span>`;
-                        htmlBuffer += `<tr class="${diffDays <= 45 ? 'row-warning' : ''}"><td>${p.id}</td><td>${p.name}</td><td>${cleanToStandardDate(lot.importDate)}</td><td>${cleanToStandardDate(lot.expiryDate)}</td><td><b>${lot.qty}</b> พาเลท</td><td>${status}</td></tr>`;
+                        
+                        const totalMU = lot.qty * (p.perPallet || 0);
+
+                        htmlBuffer += `<tr class="${diffDays <= 45 ? 'row-warning' : ''}">
+                            <td>${p.id}</td>
+                            <td>${p.name}</td>
+                            <td>${cleanToStandardDate(lot.importDate)}</td>
+                            <td>${cleanToStandardDate(lot.expiryDate)}</td>
+                            <td><b>${lot.qty}</b> พาเลท</td>
+                            <td><b>${totalMU.toLocaleString()}</b> MU</td>
+                            <td>${status}</td>
+                        </tr>`;
                     });
                 }
             });
@@ -1218,7 +1229,7 @@
                 ["รายงานข้อมูลล็อตสินค้าและวันหมดอายุคงเหลือ (Product Lots Expiry Report)"],
                 ["วันที่ดึงรายงาน: " + new Date().toLocaleDateString('th-TH') + " " + new Date().toLocaleTimeString('th-TH')],
                 [],
-                ["รหัสสินค้า", "ชื่อสินค้า", "วันนำเข้า (YYYY-MM-DD)", "วันหมดอายุ (YYYY-MM-DD)", "จำนวนคงเหลือ (พาเลท)", "อายุคงเหลือ (วัน)"]
+                ["รหัสสินค้า", "ชื่อสินค้า", "วันนำเข้า (YYYY-MM-DD)", "วันหมดอายุ (YYYY-MM-DD)", "จำนวนคงเหลือ (พาเลท)", "จำนวน MU สินค้า", "อายุคงเหลือ (วัน)"]
             ];
 
             let hasData = false;
@@ -1228,13 +1239,15 @@
                         if (lot.qty <= 0) return; 
                         hasData = true;
                         const diffDays = Math.ceil((new Date(cleanToStandardDate(lot.expiryDate)) - today) / (1000 * 60 * 60 * 24));
-                        
+                        const totalMU = lot.qty * (p.perPallet || 0);
+
                         rows.push([
                             p.id,
                             p.name,
                             cleanToStandardDate(lot.importDate),
                             cleanToStandardDate(lot.expiryDate),
                             Number(lot.qty),
+                            Number(totalMU),
                             diffDays <= 0 ? "หมดอายุแล้ว" : diffDays
                         ]);
                     });
@@ -1250,7 +1263,7 @@
             const ws = XLSX.utils.aoa_to_sheet(rows);
             
             ws['!cols'] = [
-                { wch: 15 }, { wch: 35 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 15 }
+                { wch: 15 }, { wch: 35 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 18 }, { wch: 15 }
             ];
 
             XLSX.utils.book_append_sheet(wb, ws, "Lots_Expiry_Report");
